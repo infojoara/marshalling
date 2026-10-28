@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stand 7 마샬링</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: wide apron stage on the left, ground-ops panel on the right; stacks to one column under 980px */
+:root {
+  --bg: #eceff2;
+  --surface: #ffffff;
+  --surface-2: #f3f5f7;
+  --ink: #1a2028;
+  --muted: #5a6571;
+  --line: #d3d9df;
+  --signal: #f2b705;
+  --on-signal: #1a2028;
+  --hivis: #e85d0c;
+  --ok: #1d8f4e;
+  --warn: #c8372a;
+  --f-display: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
+  --f-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11151a; --surface: #192028; --surface-2: #212932; --ink: #e6eaee; --muted: #94a1ae;
+    --line: #2b343e; --signal: #f5c518; --on-signal: #14181d; --hivis: #ff7a2b; --ok: #3cc47a; --warn: #f0645a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11151a; --surface: #192028; --surface-2: #212932; --ink: #e6eaee; --muted: #94a1ae;
+  --line: #2b343e; --signal: #f5c518; --on-signal: #14181d; --hivis: #ff7a2b; --ok: #3cc47a; --warn: #f0645a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px 32px;
+}
+.wrap { max-width: 1320px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.brand h1 {
+  font: 700 30px/1 var(--f-display); letter-spacing: .02em; margin: 0; text-transform: uppercase;
+  text-wrap: balance;
+}
+.brand h1 b { background: var(--signal); color: var(--on-signal); padding: 0 8px; margin-right: 6px; font-weight: 700; }
+.brand p { margin: 0; color: var(--muted); font-size: 14px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  font: 500 12px/1 var(--f-mono); padding: 6px 10px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--muted); display: inline-flex; align-items: center; gap: 6px;
+}
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
+.chip.on { color: var(--ok); border-color: var(--ok); }
+.chip.on::before { background: var(--ok); }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
+@media (max-width: 980px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+.stage-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.stage { position: relative; border-radius: 10px; overflow: hidden; background: #596068; }
+#sim { display: block; width: 100%; max-width: 100%; aspect-ratio: 3 / 2; }
+.hud { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; gap: 8px; flex-wrap: wrap; pointer-events: none; }
+.hud .cell {
+  background: rgba(14, 18, 23, .8); color: #f2f4f6; border-radius: 6px; padding: 6px 10px;
+  display: flex; flex-direction: column; gap: 2px; min-width: 74px;
+}
+.hud .k { font: 500 10px/1 var(--f-mono); letter-spacing: .08em; color: #9aa6b2; text-transform: uppercase; }
+.hud .v { font: 700 22px/1 var(--f-display); font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.hud .cmd .v { color: #f5c518; font-size: 26px; }
+.hud .src .v { font-size: 16px; font-family: var(--f-body); font-weight: 600; }
+.msg {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
+  max-width: calc(100% - 24px); padding: 8px 14px; border-radius: 6px;
+  font-weight: 600; font-size: 14px; color: #fff; text-align: center;
+}
+.msg.ok { background: #1d8f4e; }
+.msg.warn { background: #c8372a; }
+
+.controls { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: 8px; }
+@media (max-width: 560px) { .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); } .controls .reset { grid-column: 1 / -1; } }
+.act {
+  font: 600 15px/1.2 var(--f-body); padding: 10px 8px; border-radius: 8px; cursor: pointer;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line);
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.act kbd { font: 500 11px/1 var(--f-mono); color: var(--muted); }
+.act:hover { border-color: var(--muted); }
+.act.active { background: var(--signal); color: var(--on-signal); border-color: var(--signal); }
+.act.active kbd { color: var(--on-signal); }
+.reset { font: 600 14px/1 var(--f-body); padding: 10px 14px; border-radius: 8px; cursor: pointer; background: transparent; color: var(--muted); border: 1px dashed var(--line); }
+.hint { margin: 0; color: var(--muted); font-size: 13px; }
+
+.panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px;
+  display: flex; flex-direction: column; gap: 10px; min-width: 0;
+}
+.card h2 {
+  margin: 0; font: 700 15px/1 var(--f-display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+}
+.card h2 span { font: 500 11px/1 var(--f-mono); letter-spacing: 0; text-transform: none; }
+.views { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.views figure { margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.views canvas { width: 100%; max-width: 100%; aspect-ratio: 1; display: block; border-radius: 6px; background: #20262d; }
+.views figcaption { font-size: 12px; color: var(--muted); text-align: center; }
+
+label.lbl { font-size: 13px; color: var(--muted); }
+input[type="url"], select {
+  font: 14px/1.3 var(--f-body); color: var(--ink); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; width: 100%; min-width: 0;
+}
+input[type="url"] { font-family: var(--f-mono); font-size: 12px; }
+.btn {
+  font: 600 14px/1 var(--f-body); padding: 11px 14px; border-radius: 8px; cursor: pointer; border: 1px solid transparent;
+  background: var(--signal); color: var(--on-signal);
+}
+.btn.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn:disabled { opacity: .55; cursor: progress; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--hivis); outline-offset: 2px; }
+.status { font-size: 13px; color: var(--muted); margin: 0; }
+.status.err { color: var(--warn); }
+
+.classes { display: flex; flex-direction: column; gap: 10px; }
+.cls { display: grid; grid-template-columns: minmax(0, 1fr) 104px; gap: 4px 8px; align-items: center; }
+.cls .name { font-weight: 600; overflow-wrap: anywhere; }
+.cls .pct { font: 500 12px/1 var(--f-mono); color: var(--muted); margin-left: 6px; font-variant-numeric: tabular-nums; }
+.cls select { padding: 5px 6px; font-size: 13px; }
+.bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--muted); transition: width .12s linear; }
+.cls.top .bar i { background: var(--hivis); }
+.empty { font-size: 13px; color: var(--muted); margin: 0; }
+
+.tune { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; font-size: 13px; }
+.tune output { font: 500 12px/1 var(--f-mono); font-variant-numeric: tabular-nums; }
+.tune input { grid-column: 1 / -1; width: 100%; accent-color: var(--hivis); }
+
+.log {
+  font: 12px/1.6 var(--f-mono); color: var(--muted); background: var(--surface-2);
+  border-radius: 6px; padding: 8px 10px; max-height: 120px; overflow: auto; margin: 0; white-space: pre-wrap;
+}
+@media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1><b>7</b>Stand 7 마샬링</h1>
+      <p>마샬러 포즈를 인식해 항공기를 주기장 정지선까지 유도해요.</p>
+    </div>
+    <div class="chips" aria-live="polite">
+      <span class="chip" id="chipModel">모델</span>
+      <span class="chip" id="chipCam">카메라</span>
+      <span class="chip" id="chipBit">micro:bit</span>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section class="stage-col" aria-label="착륙장 시뮬레이션">
+      <div class="stage">
+        <canvas id="sim" aria-label="위에서 본 에이프런. 항공기와 마샬러가 보입니다."></canvas>
+        <div class="hud">
+          <div class="cell cmd"><span class="k">Signal</span><span class="v" id="hudCmd">정지</span></div>
+          <div class="cell"><span class="k">GS</span><span class="v" id="hudGs">0 kt</span></div>
+          <div class="cell"><span class="k">HDG</span><span class="v" id="hudHdg">090°</span></div>
+          <div class="cell src"><span class="k">입력</span><span class="v" id="hudSrc">수동</span></div>
+        </div>
+        <div class="msg" id="msg" hidden></div>
+      </div>
+      <div class="controls" role="group" aria-label="수동 신호">
+        <button class="act" data-act="forward" type="button">전진<kbd>↑ / W</kbd></button>
+        <button class="act" data-act="left" type="button">좌회전<kbd>← / A</kbd></button>
+        <button class="act" data-act="right" type="button">우회전<kbd>→ / D</kbd></button>
+        <button class="act active" data-act="stop" type="button">정지<kbd>Space / S</kbd></button>
+        <button class="reset" id="resetBtn" type="button">처음 위치로 (R)</button>
+      </div>
+      <p class="hint">택시웨이 B에서 들어온 항공기를 노란 유도선을 따라 좌회전시키고, 기수를 정지선(STOP)에 맞춰 세우면 주기 완료예요. 카메라 없이도 버튼이나 키보드로 먼저 연습할 수 있어요.</p>
+    </section>
+
+    <aside class="panel">
+      <div class="card">
+        <h2>마샬러 <span id="camState">카메라 꺼짐</span></h2>
+        <div class="views">
+          <figure><canvas id="cam" width="240" height="240"></canvas><figcaption>카메라 · 포즈</figcaption></figure>
+          <figure><canvas id="sig" width="240" height="240"></canvas><figcaption>현재 신호</figcaption></figure>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Teachable Machine 모델</h2>
+        <label class="lbl" for="modelUrl">포즈 프로젝트에서 ‘모델 업로드’ 후 받은 링크</label>
+        <input id="modelUrl" type="url" placeholder="https://teachablemachine.withgoogle.com/models/XXXXXXX/" autocomplete="off" spellcheck="false">
+        <button class="btn" id="startBtn" type="button">모델 불러오고 카메라 켜기</button>
+        <p class="status" id="modelStatus">링크를 붙여넣고 버튼을 누르세요. 카메라 권한을 묻는 창이 뜨면 허용하세요.</p>
+      </div>
+
+      <div class="card">
+        <h2>클래스 → 신호 <span>자동 매칭</span></h2>
+        <div class="classes" id="classes">
+          <p class="empty">모델을 불러오면 클래스(예: Come ahead, Left turn, Right turn, Stop)가 여기에 나타나고 신호와 자동으로 짝지어져요.</p>
+        </div>
+        <div class="tune">
+          <label for="th">인식 기준 확률</label><output id="thOut">80%</output>
+          <input id="th" type="range" min="50" max="99" value="80">
+          <label for="hold">같은 포즈 유지 프레임</label><output id="holdOut">5</output>
+          <input id="hold" type="range" min="1" max="15" value="5">
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>micro:bit <span>USB · 115200</span></h2>
+        <p class="status" id="bitStatus">연결하면 신호가 바뀔 때마다 클래스 이름을 줄바꿈과 함께 보내요. 지금 쓰는 마이크로비트 코드가 그대로 동작해요.</p>
+        <button class="btn ghost" id="bitBtn" type="button">micro:bit 연결</button>
+        <pre class="log" id="bitLog" hidden></pre>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/pose@0.8.6/dist/teachablemachine-pose.min.js"></script>
+<script>
+(() => {
+  // ---------- constants ----------
+  const ACTIONS = {
+    forward: { ko: '전진',   send: 'Come ahead' },
+    left:    { ko: '좌회전', send: 'Left turn' },
+    right:   { ko: '우회전', send: 'Right turn' },
+    stop:    { ko: '정지',   send: 'Stop' },
+  };
+  const W = 900, H = 600;
+  const MARSHAL = { x: 450, y: 112 };
+  const STOP_Y = 200, LEAD_X = 450;
+  const NOSE = 60;                     // centre → nose distance
+  const MAXV = 46, TURNV = 28;         // px/s
+  const ACC = 22, DEC = 45;            // px/s²
+  const TURN_RATE = 0.32;              // rad/s at turn speed
+  const KT_PER_PX = 12 / MAXV;
+
+  const $ = (id) => document.getElementById(id);
+  const sim = $('sim'), ctx = sim.getContext('2d');
+  const sig = $('sig'), sctx = sig.getContext('2d');
+  const cam = $('cam'), cctx = cam.getContext('2d');
+
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  sim.width = W * dpr; sim.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // ---------- state ----------
+  const state = {
+    cmd: 'stop', source: '수동', sendName: null,
+    plane: null, trail: [], trailT: 0,
+    halt: null, parked: false,
+  };
+
+  function resetPlane() {
+    state.plane = { x: 140, y: 530, h: Math.PI / 2, v: 0 };
+    state.trail = []; state.halt = null; state.parked = false;
+    setCommand('stop', '수동');
+  }
+
+  function setCommand(cmd, source, className) {
+    const changed = cmd !== state.cmd;
+    state.cmd = cmd; state.source = source;
+    $('hudCmd').textContent = ACTIONS[cmd].ko;
+    $('hudSrc').textContent = source;
+    document.querySelectorAll('.act').forEach(b => b.classList.toggle('active', b.dataset.act === cmd));
+    if (changed) sendToMicrobit(className || nameForAction(cmd));
+  }
+
+  // ---------- physics ----------
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const noseOf = (p) => ({ x: p.x + Math.sin(p.h) * NOSE, y: p.y - Math.cos(p.h) * NOSE });
+
+  function step(dt) {
+    const p = state.plane;
+    const cmd = state.halt ? 'stop' : state.cmd;
+    let target = 0, omega = 0;
+    if (cmd === 'forward') target = MAXV;
+    if (cmd === 'left' || cmd === 'right') { target = TURNV; omega = (cmd === 'left' ? -1 : 1) * TURN_RATE; }
+    p.v += clamp(target - p.v, -DEC * dt, ACC * dt);
+    p.h += omega * dt * Math.min(1, p.v / TURNV);
+    p.x += Math.sin(p.h) * p.v * dt;
+    p.y -= Math.cos(p.h) * p.v * dt;
+
+    state.trailT += dt;
+    if (p.v > 1 && state.trailT > 0.12) {
+      state.trailT = 0;
+      const n = noseOf(p);
+      state.trail.push({ x: n.x - Math.sin(p.h) * 8, y: n.y + Math.cos(p.h) * 8 });
+      if (state.trail.length > 400) state.trail.shift();
+    }
+
+    const n = noseOf(p);
+    if (!state.halt) {
+      if (Math.hypot(n.x - MARSHAL.x, n.y - MARSHAL.y) < 62) halt('마샬러와 너무 가까워요. 비상 정지!');
+      else if (n.x < 12 || n.x > W - 12 || n.y < 12 || n.y > H - 12) halt('에이프런 경계에 닿았어요.');
+    }
+    let herr = ((p.h % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    if (herr > Math.PI) herr -= Math.PI * 2;
+    state.parked = !state.halt && p.v < 0.6 && Math.abs(n.y - STOP_Y) < 14 && Math.abs(n.x - LEAD_X) < 14 && Math.abs(herr) < 0.14;
+  }
+
+  function halt(reason) {
+    state.halt = reason;
+    setCommand('stop', state.source);
+  }
+
+  // ---------- drawing: apron ----------
+  function drawApron() {
+    ctx.fillStyle = '#596068'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#50565d'; ctx.fillRect(0, 470, W, 120);           // taxiway pavement
+    ctx.strokeStyle = 'rgba(0,0,0,.16)'; ctx.lineWidth = 1;            // concrete slab joints
+    ctx.beginPath();
+    for (let x = 0; x <= W; x += 60) { ctx.moveTo(x + .5, 0); ctx.lineTo(x + .5, H); }
+    for (let y = 0; y <= H; y += 60) { ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); }
+    ctx.stroke();
+    // taxiway edge lines
+    ctx.strokeStyle = '#e8b800'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, 470); ctx.lineTo(280, 470); ctx.moveTo(620, 470); ctx.lineTo(W, 470);
+    ctx.moveTo(0, 590); ctx.lineTo(W, 590); ctx.stroke();
+    // stand safety line (red dashed)
+    ctx.setLineDash([16, 10]); ctx.strokeStyle = '#c9392c'; ctx.lineWidth = 3;
+    ctx.strokeRect(290, 28, 320, 400); ctx.setLineDash([]);
+    // lead-in line
+    ctx.strokeStyle = '#f2c200'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(0, 530); ctx.lineTo(330, 530);
+    ctx.arc(330, 410, 120, Math.PI / 2, 0, true);
+    ctx.lineTo(LEAD_X, STOP_Y); ctx.stroke();
+    // alignment ticks on the lead-in
+    ctx.lineWidth = 2;
+    for (let y = 400; y > STOP_Y + 10; y -= 40) { ctx.beginPath(); ctx.moveTo(LEAD_X - 8, y); ctx.lineTo(LEAD_X + 8, y); ctx.stroke(); }
+    // stop bar
+    ctx.lineCap = 'butt'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(LEAD_X - 34, STOP_Y); ctx.lineTo(LEAD_X + 34, STOP_Y); ctx.stroke();
+    ctx.fillStyle = '#f2c200'; ctx.font = '700 15px "Barlow Condensed", sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('STOP', LEAD_X + 62, STOP_Y + 5);
+    // stand number board
+    ctx.fillStyle = '#14181d'; ctx.fillRect(530, 300, 54, 64);
+    ctx.fillStyle = '#f2c200'; ctx.font = '700 52px "Barlow Condensed", sans-serif';
+    ctx.fillText('7', 557, 352);
+    // taxiway sign
+    ctx.fillStyle = '#14181d'; ctx.fillRect(18, 486, 74, 26);
+    ctx.fillStyle = '#f2c200'; ctx.font = '700 18px "Barlow Condensed", sans-serif';
+    ctx.fillText('TWY B', 55, 505);
+    ctx.textAlign = 'start'; ctx.lineCap = 'butt';
+  }
+
+  function drawTrail() {
+    ctx.fillStyle = 'rgba(20,22,25,.35)';
+    for (const t of state.trail) { ctx.beginPath(); ctx.arc(t.x, t.y, 1.6, 0, Math.PI * 2); ctx.fill(); }
+  }
+
+  // ---------- drawing: aircraft (top-down, nose = -y) ----------
+  function wingPath(c) {
+    c.beginPath();
+    c.moveTo(-6, -8); c.lineTo(-64, 20); c.lineTo(-64, 28); c.lineTo(-6, 14); c.closePath();
+    c.moveTo(6, -8); c.lineTo(64, 20); c.lineTo(64, 28); c.lineTo(6, 14); c.closePath();
+    c.moveTo(-3, 44); c.lineTo(-25, 55); c.lineTo(-25, 60); c.lineTo(-3, 55); c.closePath();
+    c.moveTo(3, 44); c.lineTo(25, 55); c.lineTo(25, 60); c.lineTo(3, 55); c.closePath();
+  }
+  function bodyPath(c) {
+    c.beginPath();
+    c.moveTo(0, -62);
+    c.bezierCurveTo(6, -61, 7.5, -50, 7.5, -40);
+    c.lineTo(7.5, 44); c.lineTo(3, 60); c.lineTo(-3, 60); c.lineTo(-7.5, 44); c.lineTo(-7.5, -40);
+    c.bezierCurveTo(-7.5, -50, -6, -61, 0, -62);
+    c.closePath();
+  }
+  function drawPlane(t) {
+    const p = state.plane;
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.h);
+    // shadow
+    ctx.save(); ctx.translate(6, 8); ctx.fillStyle = 'rgba(0,0,0,.28)';
+    wingPath(ctx); ctx.fill(); bodyPath(ctx); ctx.fill(); ctx.restore();
+    // wings + stabilisers
+    ctx.fillStyle = '#c9d0d7'; ctx.strokeStyle = '#8a949e'; ctx.lineWidth = 1;
+    wingPath(ctx); ctx.fill(); ctx.stroke();
+    // engines
+    ctx.fillStyle = '#9aa3ac';
+    ctx.fillRect(-28.5, -10, 9, 18); ctx.fillRect(19.5, -10, 9, 18);
+    ctx.fillStyle = '#3a4048';
+    ctx.fillRect(-28.5, -10, 9, 3); ctx.fillRect(19.5, -10, 9, 3);
+    // fuselage
+    ctx.fillStyle = '#f4f6f8'; bodyPath(ctx); ctx.fill(); ctx.strokeStyle = '#8a949e'; ctx.stroke();
+    // tail fin (livery)
+    ctx.strokeStyle = '#1c4e80'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(0, 38); ctx.lineTo(0, 59); ctx.stroke(); ctx.lineCap = 'butt';
+    // cockpit
+    ctx.fillStyle = '#26323e';
+    ctx.beginPath(); ctx.moveTo(-5, -50); ctx.quadraticCurveTo(0, -56, 5, -50); ctx.lineTo(4.5, -47); ctx.quadraticCurveTo(0, -51, -4.5, -47); ctx.closePath(); ctx.fill();
+    // nav lights: left red, right green; beacon blinks
+    ctx.fillStyle = '#ff3b30'; ctx.beginPath(); ctx.arc(-64, 24, 2.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#34c759'; ctx.beginPath(); ctx.arc(64, 24, 2.6, 0, Math.PI * 2); ctx.fill();
+    if ((t % 1.2) < 0.18) { ctx.fillStyle = 'rgba(255,60,48,.9)'; ctx.beginPath(); ctx.arc(0, 6, 4, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+  }
+
+  // ---------- drawing: marshaller (top-down, facing the aircraft = +y) ----------
+  function drawMarshallerTop(t) {
+    const m = MARSHAL, cmd = state.halt ? 'stop' : state.cmd;
+    ctx.save(); ctx.translate(m.x, m.y);
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(4, 6, 17, 10, 0, 0, Math.PI * 2); ctx.fill();
+    // wands: screen-west is the pilot's left
+    const wand = (x1, y1, x2, y2) => {
+      ctx.strokeStyle = '#ff5a1f'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,120,60,.35)'; ctx.beginPath(); ctx.arc(x2, y2, 6, 0, Math.PI * 2); ctx.fill();
+    };
+    const bob = Math.sin(t * 5) * 5;
+    if (cmd === 'forward') { wand(-12, 2, -14, 18 + bob); wand(12, 2, 14, 18 + bob); }
+    if (cmd === 'left')    { wand(-12, 0, -44, 0); wand(12, 2, 14, 18 + bob); }
+    if (cmd === 'right')   { wand(12, 0, 44, 0); wand(-12, 2, -14, 18 + bob); }
+    if (cmd === 'stop')    { const s = 30 + Math.sin(t * 2.6) * 8; wand(-12, 0, -s, -4); wand(12, 0, s, -4); }
+    ctx.lineCap = 'butt';
+    // body: hi-vis vest + helmet
+    ctx.fillStyle = '#e85d0c'; ctx.beginPath(); ctx.ellipse(0, 0, 15, 8, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#e9edf0'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-11, -2); ctx.lineTo(11, -2); ctx.stroke();
+    ctx.fillStyle = '#f4f6f8'; ctx.beginPath(); ctx.arc(0, 1, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawSim(t) {
+    drawApron(); drawTrail(); drawPlane(t); drawMarshallerTop(t);
+  }
+
+  // ---------- drawing: marshaller front view (as the pilot sees it) ----------
+  function armPose(cmd, side, t) {
+    // side -1 = viewer's left (marshaller's right arm), +1 = viewer's right
+    const beckon = () => { const p = (Math.sin(t * 5) + 1) / 2; return [[side * 28, 14], [side * 22, -32 + 34 * p]]; };
+    if (cmd === 'forward') return beckon();
+    if (cmd === 'left')  return side < 0 ? [[-27, 0], [-56, 0]] : beckon();
+    if (cmd === 'right') return side > 0 ? [[27, 0], [56, 0]] : beckon();
+    // stop: arms out to the side, raised until the wands cross overhead
+    const q = Math.min(1, (t % 2.6) / 1.7), th = q * 1.92;
+    const dx = side * Math.cos(th), dy = -Math.sin(th);
+    return [[dx * 27, dy * 27], [dx * 55, dy * 55]];
+  }
+  function drawSignal(t) {
+    const c = sctx, cmd = state.halt ? 'stop' : state.cmd;
+    c.fillStyle = '#20262d'; c.fillRect(0, 0, 240, 240);
+    c.fillStyle = '#2b323a'; c.fillRect(0, 204, 240, 36);
+    const cx = 120, sy = 98;
+    // legs
+    c.strokeStyle = '#2f3a46'; c.lineWidth = 12; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(cx - 9, 156); c.lineTo(cx - 12, 202); c.moveTo(cx + 9, 156); c.lineTo(cx + 12, 202); c.stroke();
+    // torso (vest)
+    c.fillStyle = '#e85d0c'; c.beginPath(); c.roundRect ? c.roundRect(cx - 21, sy - 6, 42, 66, 8) : c.rect(cx - 21, sy - 6, 42, 66); c.fill();
+    c.fillStyle = '#d9dee3'; c.fillRect(cx - 21, sy + 26, 42, 5); c.fillRect(cx - 21, sy + 40, 42, 5);
+    // head + ear defenders
+    c.fillStyle = '#e2b38f'; c.beginPath(); c.arc(cx, sy - 22, 13, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#f4f6f8'; c.beginPath(); c.arc(cx, sy - 27, 13, Math.PI, 0); c.fill();
+    c.fillStyle = '#1f2b37'; c.fillRect(cx - 16, sy - 26, 5, 10); c.fillRect(cx + 11, sy - 26, 5, 10);
+    // arms + wands
+    for (const side of [-1, 1]) {
+      const sx = cx + side * 21;
+      const [e, h] = armPose(cmd, side, t);
+      const ex = sx + e[0], ey = sy + e[1], hx = sx + h[0], hy = sy + h[1];
+      c.strokeStyle = '#e85d0c'; c.lineWidth = 9;
+      c.beginPath(); c.moveTo(sx, sy); c.lineTo(ex, ey); c.lineTo(hx, hy); c.stroke();
+      const len = Math.hypot(hx - ex, hy - ey) || 1;
+      const wx = hx + (hx - ex) / len * 30, wy = hy + (hy - ey) / len * 30;
+      c.strokeStyle = '#ff4d1a'; c.lineWidth = 6;
+      c.beginPath(); c.moveTo(hx, hy); c.lineTo(wx, wy); c.stroke();
+      c.fillStyle = 'rgba(255,110,50,.35)'; c.beginPath(); c.arc(wx, wy, 9, 0, Math.PI * 2); c.fill();
+    }
+    c.lineCap = 'butt';
+    c.fillStyle = '#f5c518'; c.font = '700 22px "Barlow Condensed", sans-serif'; c.textAlign = 'center';
+    c.fillText(ACTIONS[cmd].ko, cx, 230); c.textAlign = 'start';
+  }
+
+  function drawCamPlaceholder(text) {
+    cctx.fillStyle = '#20262d'; cctx.fillRect(0, 0, 240, 240);
+    cctx.fillStyle = '#8b97a3'; cctx.font = '500 14px "IBM Plex Sans KR", sans-serif'; cctx.textAlign = 'center';
+    cctx.fillText(text, 120, 124); cctx.textAlign = 'start';
+  }
+
+  // ---------- HUD ----------
+  let lastMsg = '';
+  function updateHud() {
+    const p = state.plane;
+    $('hudGs').textContent = Math.round(p.v * KT_PER_PX) + ' kt';
+    let deg = Math.round(((p.h * 180 / Math.PI) % 360 + 360) % 360);
+    if (deg === 0) deg = 360;
+    $('hudHdg').textContent = String(deg).padStart(3, '0') + '°';
+    let text = '', cls = '';
+    if (state.halt) { text = state.halt + ' ‘처음 위치로’를 눌러 다시 시작하세요.'; cls = 'warn'; }
+    else if (state.parked) { text = 'Stand 7 정위치 주기 완료!'; cls = 'ok'; }
+    const key = cls + text;
+    if (key !== lastMsg) {
+      lastMsg = key;
+      const m = $('msg'); m.hidden = !text; m.textContent = text; m.className = 'msg ' + cls;
+    }
+  }
+
+  // ---------- main loop ----------
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const t = now / 1000;
+    step(dt); drawSim(t); drawSignal(t); updateHud();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- manual input ----------
+  document.querySelectorAll('.act').forEach(b => b.addEventListener('click', () => setCommand(b.dataset.act, '수동')));
+  $('resetBtn').addEventListener('click', resetPlane);
+  const KEYS = { ArrowUp: 'forward', KeyW: 'forward', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', Space: 'stop', KeyS: 'stop' };
+  window.addEventListener('keydown', (e) => {
+    const tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
+    if (e.code === 'KeyR') { resetPlane(); return; }
+    const act = KEYS[e.code];
+    if (act) { e.preventDefault(); setCommand(act, '수동'); }
+  });
+
+  // ---------- Teachable Machine pose ----------
+  let model = null, webcam = null, running = false, busy = false;
+  let labels = [], mapping = {}, rowEls = {};
+  let streak = { cls: null, n: 0 };
+
+  const urlInput = $('modelUrl');
+  try { const saved = localStorage.getItem('stand7.modelUrl'); if (saved) urlInput.value = saved; } catch (e) {}
+
+  function guessAction(name) {
+    const n = name.toLowerCase();
+    if (/stop|halt|정지|멈/.test(n)) return 'stop';
+    if (/left|좌|왼/.test(n)) return 'left';
+    if (/right|우회|오른/.test(n)) return 'right';
+    if (/come|ahead|forward|straight|전진|앞/.test(n)) return 'forward';
+    return 'none';
+  }
+  function nameForAction(act) {
+    const hit = labels.find(l => mapping[l] === act);
+    return hit || ACTIONS[act].send;
+  }
+
+  function buildClassRows() {
+    const box = $('classes'); box.textContent = ''; rowEls = {};
+    labels.forEach((name, i) => {
+      if (!(name in mapping)) mapping[name] = guessAction(name);
+      const row = document.createElement('div'); row.className = 'cls';
+      const nm = document.createElement('div'); nm.className = 'name';
+      const txt = document.createElement('span'); txt.textContent = name;
+      const pct = document.createElement('span'); pct.className = 'pct'; pct.textContent = '0%';
+      nm.append(txt, pct);
+      const sel = document.createElement('select'); sel.id = 'map' + i; sel.setAttribute('aria-label', name + ' 신호');
+      [['forward', '전진'], ['left', '좌회전'], ['right', '우회전'], ['stop', '정지'], ['none', '무시']].forEach(([v, l]) => {
+        const o = document.createElement('option'); o.value = v; o.textContent = l; sel.append(o);
+      });
+      sel.value = mapping[name];
+      sel.addEventListener('change', () => { mapping[name] = sel.value; });
+      const bar = document.createElement('div'); bar.className = 'bar'; const fill = document.createElement('i'); bar.append(fill);
+      row.append(nm, sel, bar); box.append(row);
+      rowEls[name] = { row, pct, fill };
+    });
+  }
+
+  function handlePrediction(pred) {
+    let top = pred[0];
+    for (const p of pred) if (p.probability > top.probability) top = p;
+    for (const p of pred) {
+      const r = rowEls[p.className]; if (!r) continue;
+      const v = Math.round(p.probability * 100);
+      r.pct.textContent = v + '%'; r.fill.style.width = v + '%';
+      r.row.classList.toggle('top', p === top);
+    }
+    const th = +$('th').value / 100, hold = +$('hold').value;
+    if (top.probability >= th) {
+      if (streak.cls === top.className) streak.n++; else streak = { cls: top.className, n: 1 };
+    } else streak = { cls: null, n: 0 };
+    if (streak.n === hold) {
+      const act = mapping[top.className];
+      if (act && act !== 'none') setCommand(act, '카메라', top.className);
+    }
+  }
+
+  async function poseLoop() {
+    if (!running) return;
+    if (!busy) {
+      busy = true;
+      try {
+        webcam.update();
+        const { pose, posenetOutput } = await model.estimatePose(webcam.canvas);
+        const pred = await model.predict(posenetOutput);
+        if (!labels.length) { labels = pred.map(p => p.className); buildClassRows(); }
+        handlePrediction(pred);
+        cctx.drawImage(webcam.canvas, 0, 0, 240, 240);
+        if (pose) { tmPose.drawKeypoints(pose.keypoints, 0.5, cctx); tmPose.drawSkeleton(pose.keypoints, 0.5, cctx); }
+      } catch (e) { console.error(e); }
+      busy = false;
+    }
+    requestAnimationFrame(poseLoop);
+  }
+
+  function setModelStatus(text, err) { const s = $('modelStatus'); s.textContent = text; s.classList.toggle('err', !!err); }
+
+  $('startBtn').addEventListener('click', async () => {
+    if (typeof tmPose === 'undefined') {
+      setModelStatus('Teachable Machine 라이브러리를 불러오지 못했어요. 인터넷 연결을 확인하고 새로고침하세요.', true); return;
+    }
+    let url = urlInput.value.trim();
+    if (!/^https?:\/\//.test(url)) { setModelStatus('https://teachablemachine.withgoogle.com/models/… 형태의 링크를 붙여넣으세요.', true); return; }
+    url = url.split('#')[0].split('?')[0];
+    if (!url.endsWith('/')) url += '/';
+    const btn = $('startBtn'); btn.disabled = true;
+    try {
+      setModelStatus('모델을 불러오는 중…');
+      running = false;
+      model = await tmPose.load(url + 'model.json', url + 'metadata.json');
+      try { localStorage.setItem('stand7.modelUrl', url); } catch (e) {}
+      labels = (model.getClassLabels && model.getClassLabels()) || [];
+      mapping = {};
+      if (labels.length) buildClassRows();
+      $('chipModel').classList.add('on');
+    } catch (e) {
+      console.error(e);
+      setModelStatus('모델을 불러오지 못했어요. 포즈(Pose) 프로젝트에서 ‘모델 업로드’ 후 받은 링크가 맞는지 확인하세요.', true);
+      btn.disabled = false; return;
+    }
+    try {
+      if (!webcam) {
+        setModelStatus('카메라를 켜는 중…');
+        webcam = new tmPose.Webcam(240, 240, true);
+        await webcam.setup();
+        await webcam.play();
+      }
+      $('chipCam').classList.add('on'); $('camState').textContent = '인식 중';
+      setModelStatus('준비됐어요. 카메라 앞에서 마샬링 동작을 해 보세요.');
+      running = true; requestAnimationFrame(poseLoop);
+    } catch (e) {
+      console.error(e);
+      setModelStatus('카메라를 켤 수 없어요. 이 파일을 Chrome이나 Edge에서 열고 카메라 권한을 허용하세요. 다른 프로그램이 카메라를 쓰고 있으면 닫아 주세요.', true);
+    }
+    btn.disabled = false;
+    btn.textContent = '모델 다시 불러오기';
+  });
+
+  // ---------- micro:bit over Web Serial ----------
+  let port = null, writer = null;
+  const enc = new TextEncoder();
+  const logLines = [];
+  function bitLog(line) {
+    const d = new Date();
+    logLines.unshift(d.toTimeString().slice(0, 8) + '  ' + line);
+    logLines.length = Math.min(logLines.length, 8);
+    const el = $('bitLog'); el.hidden = false; el.textContent = logLines.join('\n');
+  }
+  function setBitStatus(text, err) { const s = $('bitStatus'); s.textContent = text; s.classList.toggle('err', !!err); }
+
+  async function sendToMicrobit(text) {
+    if (!writer) return;
+    try { await writer.write(enc.encode(text + '\n')); bitLog('→ ' + text); }
+    catch (e) { console.error(e); bitLog('전송 실패'); }
+  }
+
+  async function disconnectBit() {
+    try { if (writer) { writer.releaseLock(); } } catch (e) {}
+    try { if (port) await port.close(); } catch (e) {}
+    writer = null; port = null;
+    $('chipBit').classList.remove('on'); $('bitBtn').textContent = 'micro:bit 연결';
+  }
+
+  $('bitBtn').addEventListener('click', async () => {
+    if (port) { await disconnectBit(); setBitStatus('연결을 끊었어요.'); return; }
+    if (!('serial' in navigator)) { setBitStatus('이 브라우저는 Web Serial을 지원하지 않아요. Chrome이나 Edge에서 파일을 여세요.', true); return; }
+    try {
+      port = await navigator.serial.requestPort({ filters: [{ usbVendorId: 0x0d28 }] });
+      await port.open({ baudRate: 115200 });
+      writer = port.writable.getWriter();
+      $('chipBit').classList.add('on'); $('bitBtn').textContent = '연결 끊기';
+      setBitStatus('연결됐어요. 신호가 바뀔 때마다 클래스 이름을 보내요.');
+      sendToMicrobit(nameForAction(state.cmd));
+    } catch (e) {
+      console.error(e); port = null; writer = null;
+      setBitStatus(e && e.name === 'NotFoundError'
+        ? '선택한 장치가 없어요. 목록에서 micro:bit(mbed Serial Port)을 고르세요.'
+        : '포트를 열 수 없어요. MakeCode나 makeairobots.com 탭이 micro:bit을 쓰고 있으면 닫고 다시 시도하세요.', true);
+    }
+  });
+  if ('serial' in navigator) navigator.serial.addEventListener('disconnect', (e) => {
+    if (port && e.target === port) { disconnectBit(); setBitStatus('micro:bit 연결이 끊어졌어요.', true); }
+  });
+
+  // ---------- range outputs ----------
+  $('th').addEventListener('input', (e) => $('thOut').textContent = e.target.value + '%');
+  $('hold').addEventListener('input', (e) => $('holdOut').textContent = e.target.value);
+
+  // ---------- boot ----------
+  drawCamPlaceholder('카메라 대기 중');
+  resetPlane();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
